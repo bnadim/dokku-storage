@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+set -eo pipefail; [[ $DOKKU_TRACE ]] && set -x
+
+function container_for ( ) {
+  APP="$1"
+  REPO="$DOKKU_ROOT/$APP"
+  cat $REPO/CONTAINER
+}
+
+function has_storage ( ) {
+  STORAGE_OPTIONS_FILE_PATH="$1"
+  found=false
+  if [[ -f "$STORAGE_OPTIONS_FILE_PATH" ]]; then
+    DONE=false
+    until $DONE; do
+      read line || DONE=true
+
+      [[ ! -n "$line" ]] && continue
+
+      case "$line" in
+        \#*)
+          continue
+          ;;
+        *)
+          found=true
+          ;;
+      esac
+    done < $STORAGE_OPTIONS_FILE_PATH
+  fi
+  echo $found
+}
+
+function add_storage ( ) {
+  STORAGE_OPTIONS_FILE_PATH="$1"
+  REPO="$DOKKU_ROOT/$APP"
+  content=""
+  found=false
+  newStorage="$2"
+  if [[ -f "$STORAGE_OPTIONS_FILE_PATH" ]]; then
+    DONE=false
+    until $DONE; do
+      read line || DONE=true
+
+      [[ ! -n "$line" ]] && continue
+
+      case "$line" in
+        \#*)
+          continue
+          ;;
+        *)
+          content="$content\n$line"
+          arrName=(${line//\#/ })
+          name=${arrName[1]}
+          if [[ "$name" == "$newStorage" ]]; then
+            found=true
+          fi
+          ;;
+      esac
+    done < $STORAGE_OPTIONS_FILE_PATH
+  fi
+
+  result=""
+  if [[ "$found" == false ]]; then
+    content="$content\n$REPO/storage/$newStorage:/storage/$newStorage # $newStorage"
+
+  fi
+}
+
+case "$1" in
+  storage)
+    APP=$2
+    REPO="$DOKKU_ROOT/$APP"
+    STORAGE_OPTIONS_FILE_PATH="$REPO/STORAGE_OPTIONS"
+    found=$(has_storage $STORAGE_OPTIONS_FILE_PATH)
+    if [[ found == "true" ]]; then
+        echo "Storage available at /storage"
+    else
+        echo "No storage"
+    fi
+    ;;
+
+  storage:add)
+    APP=$2
+    REPO="$DOKKU_ROOT/$APP"
+    STORAGE_OPTIONS_FILE_PATH="$REPO/STORAGE_OPTIONS"
+    echo "$REPO/storage:/storage" > $STORAGE_OPTIONS_FILE_PATH
+    echo "Storage added at /storage"
+    ;;
+
+  storage:del)
+    APP=$2
+    REPO="$DOKKU_ROOT/$APP"
+    STORAGE_OPTIONS_FILE_PATH="$REPO/STORAGE_OPTIONS"
+    found=$(has_storage $STORAGE_OPTIONS_FILE_PATH)
+    if [[ found == "true" ]]; then
+        rm "$STORAGE_OPTIONS_FILE_PATH"
+        rm -R "$REPO/storage"
+        echo "Removed storage"
+    else
+        echo "No storage"
+    fi
+    ;;
+
+  help)
+    cat && cat<<EOF
+    storage <app>                                  check if a persistent storage is attached
+    storage:add <app>                              Add a persistent storage
+    storage:del <app>                              remove persistent storage
+EOF
+  ;;
+
+esac
