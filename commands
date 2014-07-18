@@ -30,49 +30,13 @@ function has_storage ( ) {
   echo $found
 }
 
-function add_storage ( ) {
-  STORAGE_OPTIONS_FILE_PATH="$1"
-  REPO="$DOKKU_ROOT/$APP"
-  content=""
-  found=false
-  newStorage="$2"
-  if [[ -f "$STORAGE_OPTIONS_FILE_PATH" ]]; then
-    DONE=false
-    until $DONE; do
-      read line || DONE=true
-
-      [[ ! -n "$line" ]] && continue
-
-      case "$line" in
-        \#*)
-          continue
-          ;;
-        *)
-          content="$content\n$line"
-          arrName=(${line//\#/ })
-          name=${arrName[1]}
-          if [[ "$name" == "$newStorage" ]]; then
-            found=true
-          fi
-          ;;
-      esac
-    done < $STORAGE_OPTIONS_FILE_PATH
-  fi
-
-  result=""
-  if [[ "$found" == false ]]; then
-    content="$content\n$REPO/storage/$newStorage:/storage/$newStorage # $newStorage"
-
-  fi
-}
-
 case "$1" in
   storage)
     APP=$2
     REPO="$DOKKU_ROOT/$APP"
     STORAGE_OPTIONS_FILE_PATH="$REPO/STORAGE_OPTIONS"
     found=$(has_storage $STORAGE_OPTIONS_FILE_PATH)
-    if [[ found == "true" ]]; then
+    if [[ $found == true ]]; then
         echo "Storage available at /storage"
     else
         echo "No storage"
@@ -95,7 +59,7 @@ case "$1" in
     REPO="$DOKKU_ROOT/$APP"
     STORAGE_OPTIONS_FILE_PATH="$REPO/STORAGE_OPTIONS"
     found=$(has_storage $STORAGE_OPTIONS_FILE_PATH)
-    if [[ found == "true" ]]; then
+    if [[ $found == true ]]; then
         rm "$STORAGE_OPTIONS_FILE_PATH"
         rm -R "$REPO/storage"
         REF=$(cat $REPO/refs/heads/master)
